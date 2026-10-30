@@ -1,24 +1,40 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import LugarCard from '../components/LugarCard.vue'
 import LugarDetailModal from '../components/LugarDetailModal.vue'
-import { Search, Sparkles, Anchor, Flame, ArrowRight } from 'lucide-vue-next'
+import { Search, Sparkles, Anchor, Flame, ArrowRight, CalendarDays, MapPin, Ticket, Heart } from 'lucide-vue-next'
 
 const props = defineProps({
   searchQuery: String,
-  lugares: Array
+  lugares: Array,
+  events: { type: Array, default: () => [] },
+  currentUser: Object,
+  favoriteIds: { type: Array, default: () => [] },
+  reviewError: String,
+  reviewSuccess: String,
 })
+const emit = defineEmits(['toggle-favorite', 'open-auth', 'share-place', 'submit-review'])
+const siteOrigin = window.location.origin
 
 const activeCategory = ref('todos')
 const selectedLugar = ref(null)
 const internalSearch = ref('')
+
+onMounted(() => {
+  const search = new URLSearchParams(window.location.search)
+  const placeId = search.get('lugar')
+  if (placeId) selectedLugar.value = props.lugares.find((place) => place.id === placeId) ?? null
+  const eventId = search.get('evento')
+  if (eventId) document.getElementById(`evento-${eventId}`)?.scrollIntoView({ behavior: 'smooth' })
+})
 
 const categories = ref([
   { id: 'todos', name: 'Todos los Sitios', icon: '✨' },
   { id: 'comida', name: 'Gastronomía & Bares', icon: '🍤' },
   { id: 'playa', name: 'Playas & Islas', icon: '🏖️' },
   { id: 'eventos', name: 'Casco Histórico & Cultura', icon: '🏛️' },
-  { id: 'comercio', name: 'Comercios & Servicios', icon: '🛍️' }
+  { id: 'comercio', name: 'Comercios & Servicios', icon: '🛍️' },
+  { id: 'hotel', name: 'Hoteles & Posadas', icon: '🛏️' }
 ])
 
 // Tags rápidos de búsqueda porteña
@@ -38,10 +54,20 @@ const filteredLugares = computed(() => {
     return matchesCategory && matchesQuery
   })
 })
+
+const featuredPlaces = computed(() => props.lugares.filter((place) => place.isFeatured))
+const favoritePlaces = computed(() => props.lugares.filter((place) => props.favoriteIds.includes(place.id)))
+
+function submitReview(review) {
+  emit('submit-review', { place: selectedLugar.value, review })
+}
 </script>
 
 <template>
   <div class="space-y-8">
+    <aside class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">
+      Confirma horarios, acceso y servicios con cada lugar antes de planificar tu visita; estos datos pueden cambiar.
+    </aside>
     
     <!-- ⚓ HERO BANNER / PROPAGINA ESTILO PORTEÑO -->
     <section class="relative rounded-3xl overflow-hidden bg-slate-950 text-white shadow-2xl border border-slate-800/80">
@@ -49,7 +75,7 @@ const filteredLugares = computed(() => {
       <!-- Fondo con imagen costera y degradados multicapa estilo atardecer/Caribe -->
       <div 
         class="absolute inset-0 z-0 bg-cover bg-center scale-105 transform transition duration-1000"
-        style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1400&q=80');"
+        style="background-image: url('/images/playa-patanemo.jpg');"
       ></div>
       
       <!-- Overlays para calidez y contraste óptimo -->
@@ -134,6 +160,44 @@ const filteredLugares = computed(() => {
       </div>
     </section>
 
+    <section v-if="props.events.length" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="flex items-center gap-2 text-lg font-extrabold text-slate-800"><CalendarDays class="h-5 w-5 text-sky-600" /> Próximos eventos</h2>
+        <span class="text-xs text-slate-500">{{ props.events.length }} próximos</span>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <article v-for="event in props.events" :id="`evento-${event.id}`" :key="event.id" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <img v-if="event.image" :src="event.image" :alt="event.title" class="h-40 w-full object-cover">
+          <div class="space-y-3 p-4">
+            <span v-if="event.isFeatured" class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800"><Sparkles class="h-3 w-3" /> Recomendado</span>
+            <h3 class="text-base font-bold text-slate-900">{{ event.title }}</h3>
+            <p class="text-sm text-slate-600">{{ event.description }}</p>
+            <p class="flex items-center gap-2 text-xs text-slate-500"><CalendarDays class="h-4 w-4 text-sky-600" />{{ new Date(event.startsAt).toLocaleString('es-VE', { dateStyle: 'medium', timeStyle: 'short' }) }}</p>
+            <p class="flex items-center gap-2 text-xs text-slate-500"><MapPin class="h-4 w-4 text-sky-600" />{{ event.venue }} · {{ event.address }}</p>
+            <p v-if="event.priceInfo" class="flex items-center gap-2 text-xs text-slate-600"><Ticket class="h-4 w-4 text-emerald-600" />{{ event.priceInfo }}</p>
+            <div class="flex flex-wrap gap-2">
+              <a :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue}, ${event.address}, Puerto Cabello`)}`" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700">Cómo llegar</a>
+              <a :href="`https://wa.me/?text=${encodeURIComponent(`${event.title} - ${event.venue}. ${siteOrigin}/?evento=${event.id}#evento-${event.id}`)}`" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Compartir evento</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="featuredPlaces.length" class="space-y-4">
+      <h2 class="flex items-center gap-2 text-lg font-extrabold text-slate-800"><Sparkles class="h-5 w-5 text-amber-500" /> Recomendados</h2>
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <LugarCard v-for="lugar in featuredPlaces" :key="lugar.id" :lugar="lugar" :can-favorite="!!currentUser" :is-favorite="favoriteIds.includes(lugar.id)" @select="selectedLugar = $event" @toggle-favorite="emit('toggle-favorite', $event)" />
+      </div>
+    </section>
+
+    <section v-if="currentUser && favoritePlaces.length" class="space-y-4">
+      <h2 class="flex items-center gap-2 text-lg font-extrabold text-slate-800"><Heart class="h-5 w-5 text-rose-500" /> Tus favoritos</h2>
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <LugarCard v-for="lugar in favoritePlaces" :key="lugar.id" :lugar="lugar" can-favorite :is-favorite="true" @select="selectedLugar = $event" @toggle-favorite="emit('toggle-favorite', $event)" />
+      </div>
+    </section>
+
     <!-- 🏷️ NAVEGACIÓN POR CATEGORÍAS -->
     <section class="space-y-3">
       <div class="flex justify-between items-center">
@@ -168,15 +232,22 @@ const filteredLugares = computed(() => {
           v-for="lugar in filteredLugares" 
           :key="lugar.id" 
           :lugar="lugar" 
+          :can-favorite="!!currentUser"
+          :is-favorite="favoriteIds.includes(lugar.id)"
           @select="selectedLugar = $event"
+          @toggle-favorite="emit('toggle-favorite', $event)"
         />
       </div>
 
       <!-- Estado sin resultados -->
       <div v-else class="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
         <div class="text-4xl">🔍</div>
-        <h3 class="font-bold text-slate-800 text-base">No encontramos resultados para tu búsqueda</h3>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">Intenta buscando lugares como "Patanemo", "Isla Larga", "Pescado", "Empanadas" o limpia el filtro de búsqueda.</p>
+        <h3 class="font-bold text-slate-800 text-base">
+          {{ lugares.length ? 'No encontramos resultados para tu búsqueda' : 'Todavía no hay lugares publicados' }}
+        </h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+          {{ lugares.length ? 'Prueba con otro término o limpia el filtro de búsqueda.' : 'Los negocios aparecerán aquí cuando un administrador apruebe sus propuestas.' }}
+        </p>
         <button @click="activeCategory = 'todos'; internalSearch = ''" class="mt-2 text-xs font-bold text-sky-600 underline">
           Ver todos los locales
         </button>
@@ -185,8 +256,16 @@ const filteredLugares = computed(() => {
 
     <!-- Modal de Detalle al seleccionar un sitio -->
     <LugarDetailModal 
-      :lugar="selectedLugar" 
-      @close="selectedLugar = null" 
+      :lugar="selectedLugar"
+      :current-user="currentUser"
+      :is-favorite="selectedLugar ? favoriteIds.includes(selectedLugar.id) : false"
+      :review-error="reviewError"
+      :review-success="reviewSuccess"
+      @toggle-favorite="emit('toggle-favorite', $event)"
+      @open-auth="emit('open-auth')"
+      @submit-review="submitReview"
+      @share="emit('share-place', selectedLugar)"
+      @close="selectedLugar = null"
     />
   </div>
 </template>

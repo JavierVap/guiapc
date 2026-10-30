@@ -1,11 +1,13 @@
 <script setup>
-import { Search, User, Compass } from 'lucide-vue-next'
+import { Search, User, LogOut, Home } from 'lucide-vue-next'
 
 defineProps({
-  searchQuery: String
+  searchQuery: String,
+  currentUser: Object,
+  currentView: String,
 })
 
-defineEmits(['update:searchQuery', 'open-auth'])
+defineEmits(['update:searchQuery', 'open-auth', 'open-dashboard', 'open-home', 'logout'])
 </script>
 
 <template>
@@ -14,13 +16,14 @@ defineEmits(['update:searchQuery', 'open-auth'])
       
       <!-- Logo -->
       <div class="flex items-center gap-2 cursor-pointer">
-        <div class="bg-sky-500 text-slate-950 p-2 rounded-xl font-black">
-          <Compass class="w-5 h-5" />
-        </div>
-        <div>
-          <span class="font-black text-lg tracking-tight text-white">Guia<span class="text-sky-400">PC</span></span>
-          <span class="hidden sm:inline-block text-[10px] text-slate-400 ml-2 font-medium">Puerto Cabello</span>
-        </div>
+        <div class="flex items-center cursor-pointer">
+        <!-- Ajusta la ruta (src) dependiendo de dónde guardes la imagen -->
+        <img 
+          src="../assets/img/logoverutas.jpg" 
+          alt="VeRutas Guía Digital de Venezuela" 
+          class="h-10 w-auto object-contain bg-white/90 p-1 rounded-lg" 
+        />
+      </div>
       </div>
 
       <!-- Buscador rápido en Header -->
@@ -37,14 +40,35 @@ defineEmits(['update:searchQuery', 'open-auth'])
         </div>
       </div>
 
-      <!-- Botón de Ingresar que activa el modal -->
-      <button 
-        @click="$emit('open-auth')" 
-        class="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-md"
-      >
-        <User class="w-4 h-4" />
-        <span>Ingresar</span>
-      </button>
+      <div class="flex items-center gap-2">
+        <template v-if="currentUser">
+          <button
+            v-if="currentView !== 'home'"
+            @click="$emit('open-home')"
+            class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-3 py-2.5 rounded-xl flex items-center gap-2 transition"
+          >
+            <Home class="w-4 h-4" /><span>Guía</span>
+          </button>
+          <button
+            v-if="['ADMIN', 'COLLABORATOR'].includes(currentUser.role)"
+            @click="$emit('open-dashboard')"
+            class="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3 py-2.5 rounded-xl transition"
+          >
+            Panel
+          </button>
+          <span class="hidden sm:inline text-xs text-slate-300">{{ currentUser.name }}</span>
+          <button @click="$emit('logout')" aria-label="Cerrar sesión" class="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl">
+            <LogOut class="w-4 h-4" />
+          </button>
+        </template>
+        <button
+          v-else
+          @click="$emit('open-auth')"
+          class="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition shadow-md"
+        >
+          <User class="w-4 h-4" /><span>Ingresar</span>
+        </button>
+      </div>
     </div>
   </header>
 </template>
